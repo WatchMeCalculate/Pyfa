@@ -8,6 +8,7 @@ from service.fit import Fit
 
 from eos.saveddata.cargo import Cargo
 from eos.db import getItem
+from service.esifittingmap import EsiFittingMap
 
 from gui.display import Display
 import gui.globalEvents as GE
@@ -187,8 +188,15 @@ class ESIExceptionHandler(object):
 
 class ExportToEve(wx.Frame):
     def __init__(self, parent):
-        wx.Frame.__init__(self, parent, id=wx.ID_ANY, title="Export fit to EVE", pos=wx.DefaultPosition,
-                          size=(wx.Size(350, 100)), style=wx.DEFAULT_FRAME_STYLE | wx.TAB_TRAVERSAL)
+        wx.Frame.__init__(
+            self,
+            parent,
+            id=wx.ID_ANY,
+            title="Export fit to EVE",
+            pos=wx.DefaultPosition,
+            size=(wx.Size(350, 400)),
+            style=wx.DEFAULT_FRAME_STYLE | wx.TAB_TRAVERSAL,
+        )
 
         self.mainFrame = parent
         self.SetBackgroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNFACE))
@@ -196,17 +204,45 @@ class ExportToEve(wx.Frame):
         mainSizer = wx.BoxSizer(wx.VERTICAL)
         hSizer = wx.BoxSizer(wx.HORIZONTAL)
 
-        self.charChoice = wx.Choice(self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, [])
+        self.charChoice = wx.Choice(
+            self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, []
+        )
         hSizer.Add(self.charChoice, 1, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+
+        self.sl = wx.StaticLine(self)
+        mainSizer.Add(self.sl, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 5)
+
         self.updateCharList()
         self.charChoice.SetSelection(0)
 
-        self.exportBtn = wx.Button(self, wx.ID_ANY, "Export Fit", wx.DefaultPosition, wx.DefaultSize, 5)
-        hSizer.Add(self.exportBtn, 0, wx.ALL, 5)
+        self.addBtn = wx.Button(
+            self, wx.ID_ANY, "Add Char", wx.DefaultPosition, wx.DefaultSize, 5
+        )
+        hSizer.Add(self.addBtn, 0, wx.ALL, 5)
 
         mainSizer.Add(hSizer, 0, wx.EXPAND, 5)
 
+        self.lcCharacters = wx.ListCtrl(
+            self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LC_REPORT
+        )
+        self.lcCharacters.InsertColumn(0, heading="Character")
+
+        mainSizer.Add(self.lcCharacters, 1, wx.ALL | wx.EXPAND, 5)
+        btnSizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        self.exportBtn = wx.Button(
+            self, wx.ID_ANY, "Sync to Eve", wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        btnSizer.Add(self.exportBtn, 0, wx.ALL | wx.EXPAND, 5)
+        self.rmvBtn = wx.Button(
+            self, wx.ID_ANY, "Remove Character", wx.DefaultPosition, wx.DefaultSize, 0
+        )
+        btnSizer.Add(self.rmvBtn, 0, wx.ALL | wx.EXPAND, 5)
+        mainSizer.Add(btnSizer, 0, wx.EXPAND, 5)
+
+        self.addBtn.Bind(wx.EVT_BUTTON, self.addCharToExport)
         self.exportBtn.Bind(wx.EVT_BUTTON, self.exportFitting)
+        self.rmvBtn.Bind(wx.EVT_BUTTON, self.delChar)
 
         self.statusbar = wx.StatusBar(self)
         self.statusbar.SetFieldsCount(2)
@@ -219,6 +255,7 @@ class ExportToEve(wx.Frame):
         self.Layout()
 
         self.Centre(wx.BOTH)
+        self.getFitCharacters()
 
     def updateCharList(self):
         sEsi = Esi.getInstance()
@@ -239,47 +276,117 @@ class ExportToEve(wx.Frame):
 
         event.Skip()
 
+    def delChar(self, event):
+        fitID = self.mainFrame.getActiveFit()
+        if fitID is None:
+            self.statusbar.SetStatusText(
+                "Please select an active fitting in the main window", 1
+            )
+            return
+        item = self.lcCharacters.GetFirstSelected()
+        if item > -1:
+            charID = self.lcCharacters.GetItemData(item)
+            eSM = EsiFittingMap.getInstance()
+            eSM.deleteFittingMap(fitID, charID)
+            self.getFitCharacters()
+
+    def addCharToExport(self, event):
+        fitID = self.mainFrame.getActiveFit()
+        if fitID is None:
+            self.statusbar.SetStatusText(
+                "Please select an active fitting in the main window", 1
+            )
+            return
+        char = self.getActiveCharacter()
+        pyfalog.warning(char)
+        if char:
+            eSM = EsiFittingMap.getInstance()
+            eSM.AddCharacterFitting(fitID, char)
+            self.getFitCharacters()
+
+    def getFitCharacters(self):
+        fitID = self.mainFrame.getActiveFit()
+        if fitID is None:
+            self.statusbar.SetStatusText(
+                "Please select an active fitting in the main window", 1
+            )
+            return
+        eSM = EsiFittingMap.getInstance()
+        chars = eSM.getEsiFittingCharacters(fitID)
+        pyfalog.error(chars)
+
+        self.lcCharacters.DeleteAllItems()
+
+        for index, char in enumerate(chars):
+            self.lcCharacters.InsertItem(
+                index, str(char.ssoCharacterID)
+            )  # char.characterName)
+            self.lcCharacters.SetItemData(index, char.ssoCharacterID)
+
     def getActiveCharacter(self):
         selection = self.charChoice.GetCurrentSelection()
-        return self.charChoice.GetClientData(selection) if selection is not None else None
+        return (
+            self.charChoice.GetClientData(selection) if selection is not None else None
+        )
 
     def exportFitting(self, event):
         sPort = Port.getInstance()
+        eSM = EsiFittingMap.getInstance()
         fitID = self.mainFrame.getActiveFit()
 
         self.statusbar.SetStatusText("", 0)
 
         if fitID is None:
-            self.statusbar.SetStatusText("Please select an active fitting in the main window", 1)
+            self.statusbar.SetStatusText(
+                "Please select an active fitting in the main window", 1
+            )
+            return
+        if self.lcCharacters.ItemCount < 1:
+            self.statusbar.SetStatusText("Please at least one character to sync to", 1)
             return
 
-        self.statusbar.SetStatusText("Sending request and awaiting response", 1)
+        chars = eSM.getEsiFittingCharacters(fitID)
         sEsi = Esi.getInstance()
-
         sFit = Fit.getInstance()
         data = sPort.exportESI(sFit.getFit(fitID))
-        res = sEsi.postFitting(self.getActiveCharacter(), data)
 
-        try:
-            res.raise_for_status()
-            self.statusbar.SetStatusText("", 0)
-            self.statusbar.SetStatusText(res.reason, 1)
-        except requests.exceptions.ConnectionError:
-            msg = "Connection error, please check your internet connection"
-            pyfalog.error(msg)
-            self.statusbar.SetStatusText("ERROR", 0)
-            self.statusbar.SetStatusText(msg, 1)
-        except ESIExportException as ex:
-            pyfalog.error(ex)
-            self.statusbar.SetStatusText("ERROR", 0)
-            self.statusbar.SetStatusText("{} - {}".format(res.status_code, res.reason), 1)
-        except APIException as ex:
+        for char in chars:
+            self.statusbar.SetStatusText("Sending request and awaiting response", 1)
             try:
-                ESIExceptionHandler(self, ex)
-            except Exception as ex:
+                try:
+                    if char.esiFitID:
+                        sEsi.delFitting(char.ssoCharacterID, char.esiFitID)
+                except:
+                    # If this fails then fit has been deleted
+                    pass
+
+                res = sEsi.postFitting(char.ssoCharacterID, data)
+                res.raise_for_status()
+                eSM.UpdateCharacterFitting(
+                    fitID, char.ssoCharacterID, res.json()["fitting_id"]
+                )
+                self.statusbar.SetStatusText("", 0)
+                self.statusbar.SetStatusText(res.reason, 1)
+            except requests.exceptions.ConnectionError:
+                msg = "Connection error, please check your internet connection"
+                pyfalog.error(msg)
                 self.statusbar.SetStatusText("ERROR", 0)
-                self.statusbar.SetStatusText("{} - {}".format(res.status_code, res.reason), 1)
+                self.statusbar.SetStatusText(msg, 1)
+            except ESIExportException as ex:
                 pyfalog.error(ex)
+                self.statusbar.SetStatusText("ERROR", 0)
+                self.statusbar.SetStatusText(
+                    "{} - {}".format(res.status_code, res.reason), 1
+                )
+            except APIException as ex:
+                try:
+                    ESIExceptionHandler(self, ex)
+                except Exception as ex:
+                    self.statusbar.SetStatusText("ERROR", 0)
+                    self.statusbar.SetStatusText(
+                        "{} - {}".format(res.status_code, res.reason), 1
+                    )
+                    pyfalog.error(ex)
 
 
 class SsoCharacterMgmt(wx.Dialog):

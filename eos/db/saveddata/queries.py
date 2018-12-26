@@ -28,6 +28,7 @@ from eos.db.util import processEager, processWhere
 from eos.saveddata.price import Price
 from eos.saveddata.user import User
 from eos.saveddata.ssocharacter import SsoCharacter
+from eos.db.saveddata.esifittingmap import EsiFittingMap
 from eos.saveddata.damagePattern import DamagePattern
 from eos.saveddata.targetResists import TargetResists
 from eos.saveddata.character import Character
@@ -467,6 +468,15 @@ def getProjectedFits(fitID):
         raise TypeError("Need integer as argument")
 
 
+def getFittingCharacters(fitID):
+    with sd_lock:
+        return saveddata_session.query(EsiFittingMap).filter(EsiFittingMap.fitID == fitID).all()
+
+def getFittingMap(fitID, ssoCharacterID):
+    with sd_lock:
+        filter = and_(EsiFittingMap.fitID == fitID, EsiFittingMap.ssoCharacterID == ssoCharacterID)
+        return saveddata_session.query(EsiFittingMap).filter(filter).first()
+
 def getSsoCharacters(clientHash, eager=None):
     eager = processEager(eager)
     with sd_lock:
@@ -532,7 +542,8 @@ def save(stuff):
 
 
 def remove(stuff):
-    removeCachedEntry(type(stuff), stuff.ID)
+    if hasattr(stuff, 'ID'):
+        removeCachedEntry(type(stuff), stuff.ID)
     with sd_lock:
         saveddata_session.delete(stuff)
     commit()
