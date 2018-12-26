@@ -134,6 +134,11 @@ class EveFittings(wx.Frame):
         sPort = Port.getInstance()
         import_type, fits = sPort.importFitFromBuffer(data)
         self.mainFrame._openAfterImport(fits)
+        char = self.getActiveCharacter()
+        data = json.loads(data)
+        eSM = EsiFittingMap.getInstance()
+        eSM.AddCharacterFitting(fits[0].ID, char, data['fitting_id'])
+
 
     def deleteFitting(self, event):
         sEsi = Esi.getInstance()
@@ -141,7 +146,6 @@ class EveFittings(wx.Frame):
         if not selection:
             return
         data = json.loads(self.fitTree.fittingsTreeCtrl.GetItemData(selection))
-
         dlg = wx.MessageDialog(self,
                                "Do you really want to delete %s (%s) from EVE?" % (data['name'], getItem(data['ship_type_id']).name),
                                "Confirm Delete", wx.YES | wx.NO | wx.ICON_QUESTION)
