@@ -472,10 +472,12 @@ def getFittingCharacters(fitID):
     with sd_lock:
         return saveddata_session.query(EsiFittingMap).filter(EsiFittingMap.fitID == fitID).all()
 
+
 def getFittingMap(fitID, ssoCharacterID):
     with sd_lock:
         filter = and_(EsiFittingMap.fitID == fitID, EsiFittingMap.ssoCharacterID == ssoCharacterID)
         return saveddata_session.query(EsiFittingMap).filter(filter).first()
+
 
 def getSsoCharacters(clientHash, eager=None):
     eager = processEager(eager)
