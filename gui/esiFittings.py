@@ -317,14 +317,12 @@ class ExportToEve(wx.Frame):
             return
         eSM = EsiFittingMap.getInstance()
         chars = eSM.getEsiFittingCharacters(fitID)
-        pyfalog.error(chars)
-
         self.lcCharacters.DeleteAllItems()
 
         for index, char in enumerate(chars):
             self.lcCharacters.InsertItem(
-                index, str(char.ssoCharacterID)
-            )  # char.characterName)
+                index, str(char.ssoCharacter.characterName)
+            )
             self.lcCharacters.SetItemData(index, char.ssoCharacterID)
 
     def getActiveCharacter(self):

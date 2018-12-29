@@ -13,6 +13,10 @@ class EsiFittingMap(object):
     def init(self):
         pass
 
+    @property
+    def ssoCharacter(self):
+        return self.__ssoCharacter
+
     def __repr__(self):
         return "esiFittingMap(fitID={}, esiFitId={}, ssoCharacterID={}) at {}".format(
             self.fitID, self.esiFitID, self.ssoCharacterID, hex(id(self))
