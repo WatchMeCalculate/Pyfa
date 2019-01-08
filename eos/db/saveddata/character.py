@@ -26,6 +26,7 @@ from eos.db.saveddata.implant import charImplants_table
 from eos.effectHandlerHelpers import HandledImplantBoosterList, HandledSsoCharacterList
 from eos.saveddata.implant import Implant
 from eos.saveddata.user import User
+from eos.saveddata.esifittingmap import EsiFittingMap 
 from eos.saveddata.character import Character, Skill
 from eos.saveddata.ssocharacter import SsoCharacter
 
@@ -59,8 +60,14 @@ sso_character_map_table = Table("ssoCharacterMap", saveddata_meta,
                   )
 
 
-mapper(SsoCharacter, sso_table)
-
+mapper(SsoCharacter, sso_table,
+        properties={
+           "_SsoCharacter__esiFittingMap": relation(
+                   EsiFittingMap,
+                   cascade='all, delete, delete-orphan',
+                   single_parent=True,
+                   backref="ssochar_fit")
+        })
 mapper(Character, characters_table,
        properties={
            "_Character__alphaCloneID": characters_table.c.alphaCloneID,

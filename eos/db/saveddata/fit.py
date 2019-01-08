@@ -37,6 +37,7 @@ from eos.saveddata.cargo import Cargo
 from eos.saveddata.character import Character
 from eos.saveddata.damagePattern import DamagePattern
 from eos.saveddata.drone import Drone
+from eos.saveddata.esifittingmap import EsiFittingMap 
 from eos.saveddata.fighter import Fighter
 from eos.saveddata.fit import Fit as es_Fit
 from eos.saveddata.implant import Implant
@@ -229,6 +230,11 @@ mapper(es_Fit, fits_table,
            "_Fit__character": relation(
                    Character,
                    backref="fits"),
+           "_Fit__esiFittingMap": relation(
+                   EsiFittingMap,
+                   cascade='all, delete, delete-orphan',
+                   single_parent=True,
+                   backref="esi_fit"),
            "_Fit__damagePattern": relation(DamagePattern),
            "_Fit__targetResists": relation(TargetResists),
            "projectedOnto": projectedFitSourceRel,
